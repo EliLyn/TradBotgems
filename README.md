@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Python Version](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=flat-square)](https://www.gnu.org/licenses/gpl-3.0)
 [![Telegram](https://img.shields.io/badge/Telegram-Alertas-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://telegram.org/)
 [![Tests](https://img.shields.io/badge/Testes-19%20Passando-success?style=flat-square)](tests/)
 
@@ -120,7 +120,7 @@ python -m unittest discover -s tests -v
 
 ## 📄 Licença
 
-Projeto aberto sob a licença [MIT](LICENSE).
+Distribuído sob a licença **GNU General Public License v3.0 (GPLv3)** - veja o arquivo [LICENSE](LICENSE) para detalhes.
 
 <div align="center">
 
