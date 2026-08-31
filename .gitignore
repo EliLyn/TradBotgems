@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# Logs and databases
+*.log
+logs/
+
+# Project runtime caches and data
+*.json
+!tradbot/default_config.json
+
+# Backup folder & legacy scripts with hardcoded credentials
+backup_original/
+TradBotGems.py
+data_collector.py
+SuperDataCollector.py
+dex_monitor.py
+dex_monitor_test.py
+bitget_websocket.py
+bitget_sdk_websocket_test.py
+
+# Audio files
+*.wav
+*.mp3
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
