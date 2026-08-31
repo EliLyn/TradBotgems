@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  tradbot-gems:
+    build: .
+    container_name: tradbot_gems
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["python", "run.py", "--mode", "gems"]
+    volumes:
+      - ./tradbotgems.log:/app/tradbotgems.log
