@@ -1,4 +1,4 @@
-# 💎 TradBotGems - Crypto Market Scanner & Telegram Alert Bot
+# 💎 TradBotGems - Scanner de Criptoativos & Alertas no Telegram
 
 <div align="center">
 
@@ -7,127 +7,95 @@
 [![Telegram](https://img.shields.io/badge/Telegram-Alerts-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://telegram.org/)
 [![Tests](https://img.shields.io/badge/Tests-19%20Passing-success?style=flat-square)](tests/)
 
-**Scanner modular em Python para filtragem de tokens (micro e small caps), consulta de métricas de futuros via CoinGlass e envio de resumos formatados no Telegram.**
+**Scanner modular em Python baseado nos scripts originais de coleta, análise de derivativos, monitor de DEX e notificações via Telegram.**
 
-[Sobre o Projeto](#-sobre-o-projeto) •
-[A Evolução (v1 vs v2)](#-a-evolução-do-projeto-v1-vs-v2) •
-[O que o Bot Realmente Faz](#-o-que-o-bot-realmente-faz) •
-[Instalação](#-instalação-e-configuração) •
-[Como Usar](#-como-usar) •
-[Testes](#-testes-unitários) •
-[Limitações Conhecidas](#-limitações-e-transparência)
+[O que havia na pasta original](#-o-que-havia-na-pasta-original-backup-de-julho2025) •
+[O que foi feito na refatoração](#-o-que-foi-feito-na-refatoração-agosto2026) •
+[Comparativo Real](#-comparativo-real-dos-arquivos) •
+[Como Funciona](#-como-funciona) •
+[Instalação e Uso](#-instalação-e-uso) •
+[Testes](#-testes-unitários)
 
 </div>
 
 ---
 
-## 📖 Sobre o Projeto
+## 📂 O que havia na pasta original (Backup de Julho/2025)
 
-O **TradBotGems** nasceu como um projeto experimental pessoal para automatizar a descoberta e o acompanhamento de tokens cripto em faixas específicas de capitalização de mercado.
+No backup original preservado em `backup_original/`, o projeto era composto por scripts independentes criados entre 30/06/2025 e 09/07/2025:
 
-Ele consome dados públicos da API da **CoinGecko**, enriquece com dados de derivativos da **CoinGlass** (quando disponíveis para o ativo) e envia relatórios estruturados para um canal ou conversa privada no **Telegram**.
+1. **`TradBotGems.py` (38 KB - 09/07/2025):**
+   - Script principal de varredura multi-página na CoinGecko (faixa de Market Cap configurada entre \$20k e \$10M).
+   - Coleta de dados de futuros na CoinGlass: Open Interest, Funding Rate, Long/Short Ratio, Volume 24h e Liquidações.
+   - Geração de notas de potencial por faixas de valor e categorias (RWA, IA, Ecossistema Bitcoin, Supply > 1T).
+   - Envio de cartões formatados em MarkdownV2 e resumo diário de Top Gainers / Alto Volume no Telegram.
+   - Simulação de contagem de transações (12h/24h) com `random.randint` para testar os gatilhos de alerta.
+
+2. **`data_collector.py` (51 KB - 06/07/2025):**
+   - Coletor com motor de pontuação por tiers: volume 24h, média de volume semanal, seguidores no Twitter, membros no Telegram e taxas de crescimento.
+   - Categorias bônus (Gaming, RWA, Bitcoin Ecosystem) somando pontos na classificação.
+   - Sistema de níveis com emojis (`🚨 CRÍTICO`, `🔴 Baixo`, `🟠 Moderado`, `🟡 Alto`, `🟢 DESTAQUE`).
+   - Mapeamento de exploradores EVM (Ethereum, BSC, Polygon, Arbitrum, Optimism, Avalanche, Fantom, Gnosis, Cronos, Base).
+
+3. **`dex_monitor.py` & `dex_monitor_test.py` (21 KB / 9 KB - 05/07/2025):**
+   - Monitoramento de pares DEX consultando a API do DexScreener para os contratos de WETH, WBNB, WMATIC, WAVAX e WFTM.
+   - Filtros locais: liquidez mínima (\$50k), volume 24h (\$50k) e transações em 60 min.
+   - Consulta à API do Honeypot.is para checagem de risco em contratos.
+
+4. **`SuperDataCollector.py` (8.5 KB - 06/07/2025):**
+   - Coletor focado em lista fixa de tokens principais (BTC, ETH, BNB, SOL, DOGE), gerando `crypto_data.json`.
+
+5. **`bitget_websocket.py` & `bitget_sdk_websocket_test.py` (6.7 KB / 4.7 KB - 06/07 a 09/07/2025):**
+   - Testes de conexão WebSocket com a exchange Bitget para dados de tickers em tempo real.
+
+6. **Arquivos de Áudio e Cache:**
+   - Efeitos sonoros locais (`caixa_registradora.wav.wav`, `sirene.wav.wav`).
+   - Caches e históricos JSON (`coingecko_token_cache.json`, `token_classification_history.json`, `known_coingecko_tokens.json`).
 
 ---
 
-## 📈 A Evolução do Projeto (v1 vs v2)
+## 🛠️ O que foi feito na refatoração (Agosto/2026)
 
-Este repositório documenta a evolução prática de um protótipo inicial para uma base de código modular e auditável:
+Os scripts isolados foram unificados em uma arquitetura de software modular dentro do pacote `tradbot/`:
 
-| Aspecto | v1.0 — Protótipo (09/07/2025) | v2.0 — Modular (31/08/2026) |
+1. **Unificação dos Módulos:**
+   - **`tradbot/clients/`**: Clientes HTTP assíncronos separados por serviço (`coingecko.py`, `coinglass.py`, `dexscreener.py`, `evm_explorer.py`, `honeypot.py`).
+   - **`tradbot/services/`**: Lógicas de negócio isoladas em `analyzer.py` (regras e scoring), `notifier.py` (Telegram), `cache.py` (gerenciamento com TTL) e `collector.py` (orquestrador de loops).
+   - **`tradbot/models.py`**: Estruturas de dados tipadas com Dataclasses (`TokenMarketSummary`, `TokenFullDetails`, `DerivativesMetrics`, `AnalysisResult`, `DexPairInfo`).
+2. **Segurança de Credenciais:**
+   - Remoção de chaves e tokens gravados diretamente no código; migração para `.env` com arquivo modelo `.env.example` e proteção via `.gitignore`.
+3. **Resolução de Rede e DNS no Windows:**
+   - Implementação de `TCPConnector(family=socket.AF_INET, resolver=ThreadedResolver())` resolvendo problemas de conexão assíncrona IPv6 no Windows.
+4. **Regra de Funções Enxutas:**
+   - Todas as funções e métodos de todos os módulos foram estruturados para ter **no máximo 25 linhas**.
+5. **Testes Automatizados:**
+   - Criação de **19 testes unitários** com `unittest` cobrindo todos os módulos do pacote.
+6. **Entry Point CLI (`run.py`):**
+   - Executável único com suporte a parâmetros: `--mode gems`, `--mode dex`, `--mode all`, `--test`, `--max-tokens`.
+
+---
+
+## 📊 Comparativo Real dos Arquivos
+
+| Arquivo Original (Backup Jul/2025) | Onde está na versão modular (Ago/2026) | O que mudou |
 | :--- | :--- | :--- |
-| **Estrutura** | Script monolítico (~800 linhas em arquivo único) | Pacote modular (`tradbot/`) com funções de no máximo 25 linhas |
-| **Segurança de Chaves** | Tokens e chaves de API hardcoded no script | Variáveis de ambiente isoladas em `.env` (bloqueadas no `.gitignore`) |
-| **Fontes de Dados** | CoinGecko + endpoints básicos da CoinGlass | Clientes desacoplados: CoinGecko, CoinGlass, DexScreener, EVM e Honeypot |
-| **Tratamento de Rede** | Requisições simples com risco de falha | Retries, resolução IPv4 forçada no Windows e fallback de cache local |
-| **Alertas Telegram** | Função de envio com escape manual frágil | Notificador com escape MarkdownV2 rigoroso e divisão de mensagens |
-| **Métricas On-Chain** | Valores de transações simulados para teste de layout | Módulos preparados para explorers EVM (Etherscan, BscScan, etc.) |
-| **Testes** | Nenhum teste automatizado | 19 testes unitários cobrindo todos os módulos (`unittest`) |
-| **Execução** | Loop único sem parâmetros | CLI com argumentos (`--mode gems`, `--mode dex`, `--test`, `--max-tokens`) |
+| `TradBotGems.py` (784 linhas) | `tradbot/services/collector.py` + `notifier.py` | Dividido em serviços desacoplados; funções ≤ 25 linhas; escape seguro |
+| `data_collector.py` (895 linhas) | `tradbot/services/analyzer.py` + `clients/evm_explorer.py` | Lógica de pontuação, categorias e mapeamento EVM transformadas em classes dedicadas |
+| `dex_monitor.py` (416 linhas) | `tradbot/services/dex_monitor.py` + `clients/dexscreener.py` + `honeypot.py` | Clientes de API isolados do serviço de monitoramento |
+| `SuperDataCollector.py` (182 linhas) | `tradbot/services/collector.py` (modo `--test`) | Integrado ao fluxo de coleta com opções de limite |
+| Chaves hardcoded nos scripts | `tradbot/config.py` + `.env` | Credenciais lidas via variáveis de ambiente com fallback seguro |
+| Sem testes unitários | Pasta `tests/` (19 testes) | Testes para formatadores, analisador, cache, clientes e modelos |
 
 ---
 
-## 🔍 O que o Bot Realmente Faz
+## ⚙️ Instalação e Uso
 
-### 1. Varredura Periódica de Mercado (CoinGecko)
-- Consulta páginas da CoinGecko em intervalos configuráveis.
-- Filtra tokens cuja capitalização de mercado esteja dentro da faixa desejada (ex: entre \$20.000 e \$10.000.000).
-- Salva o resultado em cache local (`coingecko_token_cache.json`) para evitar requisições desnecessárias.
-
-### 2. Consulta de Derivativos (CoinGlass)
-- Para cada token filtrado, consulta se há dados de derivativos disponíveis:
-  - Open Interest (OI)
-  - Funding Rate (Taxa de Financiamento)
-  - Long/Short Ratio
-  - Volume de Liquidações em 24h
-- Se o token não tiver mercado de futuros listado, o bot trata silenciosamente e marca esses campos como `N/A`.
-
-### 3. Classificação por Regras e Categorias
-- Avalia faixas de Market Cap para gerar notas descritivas.
-- Identifica palavras-chave nas categorias do token (ex: *Artificial Intelligence*, *Gaming*, *RWA*, *Bitcoin Ecosystem*).
-
-### 4. Notificações no Telegram
-- Monta um cartão formatado em MarkdownV2 com links sociais, suprimento (supply) e métricas disponíveis.
-- Gera um resumo diário opcional com os maiores ganhadores do ciclo (*Top Gainers*).
-
-### 5. Monitor de DEX (Polling Periódico)
-- Consulta a API pública do DexScreener para pares com liquidez mínima pré-definida.
-- Faz uma checagem auxiliar de contrato via API Honeypot.is.
-
----
-
-## 📁 Estrutura do Código
-
-```
-core/
-├── tradbot/                      # Pacote principal
-│   ├── __init__.py
-│   ├── config.py                 # Configurações centralizadas via .env
-│   ├── models.py                 # Modelos de dados e Dataclasses
-│   ├── clients/                  # Clientes HTTP assíncronos
-│   │   ├── base.py               # Cliente base com retry e timeout
-│   │   ├── coingecko.py          # Integração CoinGecko
-│   │   ├── coinglass.py          # Integração CoinGlass
-│   │   ├── dexscreener.py        # Integração DexScreener
-│   │   ├── evm_explorer.py       # Integração com exploradores EVM
-│   │   └── honeypot.py           # Consulta à API Honeypot.is
-│   ├── services/                 # Regras de negócio
-│   │   ├── analyzer.py           # Regras de pontuação e categorias
-│   │   ├── notifier.py           # Formatação e envio Telegram
-│   │   ├── cache.py              # Gerenciador de cache com TTL
-│   │   ├── collector.py          # Orquestrador do ciclo de gems
-│   │   └── dex_monitor.py        # Polling de pares DEX
-│   └── utils/                    # Utilitários auxiliares
-│       ├── formatting.py         # Formatação de texto e números
-│       └── logger.py             # Configuração de logs
-├── tests/                        # 19 Testes unitários automatizados
-│   ├── test_analyzer.py
-│   ├── test_cache.py
-│   ├── test_clients.py
-│   ├── test_formatting.py
-│   ├── test_models.py
-│   └── test_notifier.py
-├── backup_original/              # Cópia intacta do protótipo v1 (09/07/2025)
-├── .env.example                  # Modelo de variáveis de ambiente
-├── .gitignore                    # Regras de exclusão de chaves e dados locais
-├── requirements.txt              # Dependências Python
-├── run.py                        # Ponto de entrada CLI
-└── README.md
-```
-
----
-
-## 🛠️ Instalação e Configuração
-
-### 1. Clonar o Repositório
+### 1. Clonar e Instalar
 ```bash
 git clone https://github.com/EliLyn/TradBotGems.git
 cd TradBotGems/core
-```
 
-### 2. Criar Ambiente Virtual e Instalar Dependências
-```bash
 python -m venv venv
-
 # Windows:
 venv\Scripts\activate
 # Linux/Mac:
@@ -136,61 +104,39 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Configurar o `.env`
-Copie o modelo de configuração:
+### 2. Configurar o `.env`
+Copie o `.env.example`:
 ```bash
 cp .env.example .env
 ```
+Preencha seu `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`. A chave da `COINGLASS_API_KEY` é opcional (necessária apenas se desejar dados de futuros/derivativos).
 
-Edite o arquivo `.env` com suas credenciais:
-```ini
-TELEGRAM_BOT_TOKEN=seu_token_aqui
-TELEGRAM_CHAT_ID=seu_chat_id_aqui
-
-# Opcional (apenas se quiser derivativos da CoinGlass):
-COINGLASS_API_KEY=sua_chave_aqui
-
-# Filtros de Market Cap:
-MIN_MARKET_CAP_USD=20000
-MAX_MARKET_CAP_USD=10000000
-COLLECTION_INTERVAL_SECONDS=600
-```
-
----
-
-## 🚀 Como Usar
-
-### Teste de Conexão Rápido (1 ciclo com 3 tokens)
+### 3. Comandos de Execução
 ```bash
+# Teste rápido (1 ciclo com 3 tokens):
 python run.py --test
-```
 
-### Executar Caçador de Gems Contínuo
-```bash
+# Executar o Caçador de Gems (CoinGecko + CoinGlass):
 python run.py --mode gems
-```
 
-### Executar Monitor de Pares DEX
-```bash
+# Executar o Monitor de DEX (DexScreener + Honeypot):
 python run.py --mode dex
-```
 
-### Ajuda e Parâmetros
-```bash
-python run.py --help
+# Executar ambos simultaneamente:
+python run.py --mode all
 ```
 
 ---
 
 ## 🧪 Testes Unitários
 
-Todos os módulos possuem testes automatizados com `unittest`:
+Para rodar a suíte com os 19 testes automatizados:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Resultado esperado:
+Resultado:
 ```
 Ran 19 tests in 0.005s
 OK
@@ -198,22 +144,12 @@ OK
 
 ---
 
-## ⚠️ Limitações e Transparência
-
-Para manter a clareza técnica sobre o escopo do projeto:
-
-- **APIs Gratuitas:** A versão padrão utiliza endpoints públicos da CoinGecko e DexScreener, que possuem limites de taxa (*rate limits*). O bot possui pausas entre requisições para mitigar bloqueios.
-- **Tokens Sem Futuros:** A grande maioria das micro-caps não possui mercado de derivativos na CoinGlass; nesses casos, os campos de derivativos são exibidos como `N/A`, o que é o comportamento esperado.
-- **Finalidade:** Este software é um experimento educacional de monitoramento e automação de dados públicos, não constituindo ferramenta de recomendação financeira ou execução automática de ordens.
-
----
-
 ## 📄 Licença
 
-Este projeto é disponibilizado sob a licença [MIT](LICENSE).
+Distribuído sob a licença [MIT](LICENSE).
 
 <div align="center">
 
-*Concepção e evolução com auxílio de IA por [EliLyn](https://github.com/EliLyn).*
+*Concepção e evolução de código por [EliLyn](https://github.com/EliLyn).*
 
 </div>
