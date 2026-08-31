@@ -1,4 +1,4 @@
-# 💎 TradBotGems - Scanner de Criptoativos & Alertas no Telegram
+# 💎 TradBotGems — Minha Jornada de Construção com Inteligência Artificial
 
 <div align="center">
 
@@ -6,96 +6,142 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Telegram](https://img.shields.io/badge/Telegram-Alerts-2CA5E0?style=flat-square&logo=telegram&logoColor=white)](https://telegram.org/)
 [![Tests](https://img.shields.io/badge/Tests-19%20Passing-success?style=flat-square)](tests/)
+[![AI Powered](https://img.shields.io/badge/Desenvolvido%20com-IA-blueviolet?style=flat-square)](https://github.com/EliLyn)
 
-**Scanner modular em Python baseado nos scripts originais de coleta, análise de derivativos, monitor de DEX e notificações via Telegram.**
+**Do primeiro protótipo monolítico à arquitetura modular: o registro real de como concebo, pesquiso e construo soluções utilizando Inteligência Artificial como parceira de desenvolvimento.**
 
-[O que havia na pasta original](#-o-que-havia-na-pasta-original-backup-de-julho2025) •
-[O que foi feito na refatoração](#-o-que-foi-feito-na-refatoração-agosto2026) •
-[Comparativo Real](#-comparativo-real-dos-arquivos) •
-[Como Funciona](#-como-funciona) •
-[Instalação e Uso](#-instalação-e-uso) •
-[Testes](#-testes-unitários)
+[Sobre Mim e o Projeto](#-sobre-mim-e-este-projeto) •
+[A Origem: O Primeiro Robô](#-a-origem-o-primeiro-experimento-julho2025) •
+[O que Aprendi no Caminho](#-o-que-aprendi-no-caminho) •
+[A Transformação (v1 vs v2)](#-a-transformação-v1-vs-v2) •
+[Como Funciona](#-como-o-bot-funciona-hoje) •
+[Instalação e Uso](#-como-executar) •
+[Minha Filosofia](#-minha-filosofia)
 
 </div>
 
 ---
 
-## 📂 O que havia na pasta original (Backup de Julho/2025)
+## 👤 Sobre Mim e Este Projeto
 
-No backup original preservado em `backup_original/`, o projeto era composto por scripts independentes criados entre 30/06/2025 e 09/07/2025:
+**Eu não sou um programador tradicional.** 
 
-1. **`TradBotGems.py` (38 KB - 09/07/2025):**
-   - Script principal de varredura multi-página na CoinGecko (faixa de Market Cap configurada entre \$20k e \$10M).
-   - Coleta de dados de futuros na CoinGlass: Open Interest, Funding Rate, Long/Short Ratio, Volume 24h e Liquidações.
-   - Geração de notas de potencial por faixas de valor e categorias (RWA, IA, Ecossistema Bitcoin, Supply > 1T).
-   - Envio de cartões formatados em MarkdownV2 e resumo diário de Top Gainers / Alto Volume no Telegram.
-   - Simulação de contagem de transações (12h/24h) com `random.randint` para testar os gatilhos de alerta.
+Eu sou alguém que tem ideias de produtos, pesquisa a fundo as regras de negócio e informações de mercado necessárias, e utiliza **Inteligência Artificial como ferramenta ativa de desenvolvimento**, discutindo, questionando e aprimorando cada etapa continuamente.
 
-2. **`data_collector.py` (51 KB - 06/07/2025):**
-   - Coletor com motor de pontuação por tiers: volume 24h, média de volume semanal, seguidores no Twitter, membros no Telegram e taxas de crescimento.
-   - Categorias bônus (Gaming, RWA, Bitcoin Ecosystem) somando pontos na classificação.
-   - Sistema de níveis com emojis (`🚨 CRÍTICO`, `🔴 Baixo`, `🟠 Moderado`, `🟡 Alto`, `🟢 DESTAQUE`).
-   - Mapeamento de exploradores EVM (Ethereum, BSC, Polygon, Arbitrum, Optimism, Avalanche, Fantom, Gnosis, Cronos, Base).
-
-3. **`dex_monitor.py` & `dex_monitor_test.py` (21 KB / 9 KB - 05/07/2025):**
-   - Monitoramento de pares DEX consultando a API do DexScreener para os contratos de WETH, WBNB, WMATIC, WAVAX e WFTM.
-   - Filtros locais: liquidez mínima (\$50k), volume 24h (\$50k) e transações em 60 min.
-   - Consulta à API do Honeypot.is para checagem de risco em contratos.
-
-4. **`SuperDataCollector.py` (8.5 KB - 06/07/2025):**
-   - Coletor focado em lista fixa de tokens principais (BTC, ETH, BNB, SOL, DOGE), gerando `crypto_data.json`.
-
-5. **`bitget_websocket.py` & `bitget_sdk_websocket_test.py` (6.7 KB / 4.7 KB - 06/07 a 09/07/2025):**
-   - Testes de conexão WebSocket com a exchange Bitget para dados de tickers em tempo real.
-
-6. **Arquivos de Áudio e Cache:**
-   - Efeitos sonoros locais (`caixa_registradora.wav.wav`, `sirene.wav.wav`).
-   - Caches e históricos JSON (`coingecko_token_cache.json`, `token_classification_history.json`, `known_coingecko_tokens.json`).
+O **TradBotGems** é o reflexo direto dessa jornada: a transição de um primeiro experimento prático para uma estrutura de software profissional, modular, segura e testada.
 
 ---
 
-## 🛠️ O que foi feito na refatoração (Agosto/2026)
+## 🌱 A Origem: O Primeiro Experimento (Julho/2025)
 
-Os scripts isolados foram unificados em uma arquitetura de software modular dentro do pacote `tradbot/`:
+A ideia nasceu de uma dor real: analisar e garimpar manualmente milhares de criptomoedas em estágio inicial (*micro e small-caps*, conhecidas como *"Gems"*) consome muito tempo. Eu precisava de um robô que monitorasse o mercado 24/7 e me alertasse no **Telegram** quando encontrasse tokens com potencial e volume relevantes.
 
-1. **Unificação dos Módulos:**
-   - **`tradbot/clients/`**: Clientes HTTP assíncronos separados por serviço (`coingecko.py`, `coinglass.py`, `dexscreener.py`, `evm_explorer.py`, `honeypot.py`).
-   - **`tradbot/services/`**: Lógicas de negócio isoladas em `analyzer.py` (regras e scoring), `notifier.py` (Telegram), `cache.py` (gerenciamento com TTL) e `collector.py` (orquestrador de loops).
-   - **`tradbot/models.py`**: Estruturas de dados tipadas com Dataclasses (`TokenMarketSummary`, `TokenFullDetails`, `DerivativesMetrics`, `AnalysisResult`, `DexPairInfo`).
-2. **Segurança de Credenciais:**
-   - Remoção de chaves e tokens gravados diretamente no código; migração para `.env` com arquivo modelo `.env.example` e proteção via `.gitignore`.
-3. **Resolução de Rede e DNS no Windows:**
-   - Implementação de `TCPConnector(family=socket.AF_INET, resolver=ThreadedResolver())` resolvendo problemas de conexão assíncrona IPv6 no Windows.
-4. **Regra de Funções Enxutas:**
-   - Todas as funções e métodos de todos os módulos foram estruturados para ter **no máximo 25 linhas**.
-5. **Testes Automatizados:**
-   - Criação de **19 testes unitários** com `unittest` cobrindo todos os módulos do pacote.
-6. **Entry Point CLI (`run.py`):**
-   - Executável único com suporte a parâmetros: `--mode gems`, `--mode dex`, `--mode all`, `--test`, `--max-tokens`.
+Em 09/07/2025, nasceu o primeiro robô:
+- Um script único de quase 800 linhas (**monolítico**).
+- Funcionava e enviava mensagens, mas tinha chaves de API colocadas diretamente no código.
+- Tinha simulações randômicas de transações para testar os layouts visuais.
+- Não possuía testes automatizados nem separação em arquivos menores.
+
+Foi o protótipo que provou que a ideia era viável e me deu a base para buscar mais conhecimento.
 
 ---
 
-## 📊 Comparativo Real dos Arquivos
+## 🧠 O que Aprendi no Caminho
 
-| Arquivo Original (Backup Jul/2025) | Onde está na versão modular (Ago/2026) | O que mudou |
+Conforme fui estudando, buscando informações e discutindo novas arquiteturas com a IA, entendi que fazer um software robusto vai muito além de apenas "fazer rodar":
+
+1. **Segurança em primeiro lugar:** Chaves de API e tokens nunca devem ser expostos em código público; o uso de `.env` e `.gitignore` é obrigatório.
+2. **Modularidade e Clareza:** Dividir o código em camadas (`clients`, `services`, `models`, `utils`) torna o sistema fácil de entender, debugar e manter.
+3. **Funções Enxutas:** Limitar cada função a no máximo 25 linhas força o código a ser direto, evitando bugs escondidos.
+4. **Testes Automatizados:** Testes unitários trazem a certeza de que cada cálculo e formatação funciona como esperado.
+5. **Auditoria Contínua:** Não aceitar respostas cegas da IA — é preciso auditar, testar no terminal e exigir consistência em cada detalhe.
+
+---
+
+## 📊 A Transformação: v1 vs v2
+
+| Aspecto | v1.0 — Primeiro Experimento (Jul/2025) | v2.0 — Versão Atual Modular (Ago/2026) |
 | :--- | :--- | :--- |
-| `TradBotGems.py` (784 linhas) | `tradbot/services/collector.py` + `notifier.py` | Dividido em serviços desacoplados; funções ≤ 25 linhas; escape seguro |
-| `data_collector.py` (895 linhas) | `tradbot/services/analyzer.py` + `clients/evm_explorer.py` | Lógica de pontuação, categorias e mapeamento EVM transformadas em classes dedicadas |
-| `dex_monitor.py` (416 linhas) | `tradbot/services/dex_monitor.py` + `clients/dexscreener.py` + `honeypot.py` | Clientes de API isolados do serviço de monitoramento |
-| `SuperDataCollector.py` (182 linhas) | `tradbot/services/collector.py` (modo `--test`) | Integrado ao fluxo de coleta com opções de limite |
-| Chaves hardcoded nos scripts | `tradbot/config.py` + `.env` | Credenciais lidas via variáveis de ambiente com fallback seguro |
-| Sem testes unitários | Pasta `tests/` (19 testes) | Testes para formatadores, analisador, cache, clientes e modelos |
+| **Abordagem** | Script monolítico único (~800 linhas) | Pacote modular (`tradbot/`) dividido em responsabilidades |
+| **Tamanho de Funções** | Funções longas misturando rede e regras | **Todas as funções têm no máximo 25 linhas** |
+| **Segurança** | Chaves e tokens gravados no script | Isolamento total em `.env` (bloqueado no `.gitignore`) |
+| **Fontes de Dados** | CoinGecko + endpoints básicos da CoinGlass | Clientes desacoplados: CoinGecko, CoinGlass, DexScreener e EVM |
+| **Resiliência de Rede** | Requisições sem tratamento específico | Tratamento de rate limit, DNS IPv4 e fallback de cache local |
+| **Alertas Telegram** | Envio com formatação básica | Cartões ricos em MarkdownV2 com tratamento de tamanho |
+| **Testes** | Nenhum teste automatizado | **19 testes unitários** com `unittest` (100% de aprovação) |
+| **Interface** | Loop único sem opções de linha de comando | CLI com modos (`--mode gems`, `--mode dex`, `--test`) |
 
 ---
 
-## ⚙️ Instalação e Uso
+## ⚙️ Como o Bot Funciona Hoje
 
-### 1. Clonar e Instalar
+```
+┌────────────────────────────────────────────────────────┐
+│ 1. Varredura de Mercado (CoinGecko Client)            │
+│    Filtra tokens por faixas de valor de mercado       │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────┐
+│ 2. Derivativos & Futuros (CoinGlass Client)            │
+│    Busca Open Interest, Funding Rate e Liquidações    │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────┐
+│ 3. Motor de Análise (TokenAnalyzer Service)            │
+│    Avalia categorias (IA, RWA, Gaming, BTC) e volume  │
+└──────────────────────────┬─────────────────────────────┘
+                           │
+┌──────────────────────────▼─────────────────────────────┐
+│ 4. Notificador (TelegramNotifier Service)              │
+│    Formata o card em MarkdownV2 e envia no Telegram    │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+core/
+├── tradbot/                      # Pacote principal modular
+│   ├── config.py                 # Leitura de variáveis .env
+│   ├── models.py                 # Dataclasses tipadas
+│   ├── clients/                  # Clientes HTTP assíncronos (<= 25 linhas)
+│   │   ├── base.py               # Cliente base com retry e IPv4
+│   │   ├── coingecko.py          # Integração CoinGecko
+│   │   ├── coinglass.py          # Integração CoinGlass (Derivativos)
+│   │   ├── dexscreener.py        # Integração DexScreener
+│   │   ├── evm_explorer.py       # Exploradores EVM
+│   │   └── honeypot.py           # Consulta à API Honeypot.is
+│   ├── services/                 # Regras de negócio (<= 25 linhas)
+│   │   ├── analyzer.py           # Algoritmo de classificação e notas
+│   │   ├── notifier.py           # Formatação e envio Telegram
+│   │   ├── cache.py              # Cache local com TTL
+│   │   ├── collector.py          # Orquestrador do ciclo 24/7
+│   │   └── dex_monitor.py        # Monitor de pares em DEX
+│   └── utils/                    # Utilitários auxiliares (<= 25 linhas)
+│       ├── formatting.py         # Escape MarkdownV2 e números por extenso
+│       └── logger.py             # Configuração de logs com suporte a UTF-8
+├── tests/                        # 19 Testes unitários automatizados
+├── backup_original/              # Cópia preservada do protótipo v1 (Jul/2025)
+├── .env.example                  # Template seguro de credenciais
+├── .gitignore                    # Bloqueio de chaves e dados locais
+├── requirements.txt              # Dependências do projeto
+├── run.py                        # Ponto de entrada CLI
+└── README.md
+```
+
+---
+
+## 🚀 Como Executar
+
+### 1. Instalação
 ```bash
 git clone https://github.com/EliLyn/TradBotGems.git
 cd TradBotGems/core
 
 python -m venv venv
+
 # Windows:
 venv\Scripts\activate
 # Linux/Mac:
@@ -104,43 +150,42 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configurar o `.env`
+### 2. Configuração do `.env`
 Copie o `.env.example`:
 ```bash
 cp .env.example .env
 ```
-Preencha seu `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`. A chave da `COINGLASS_API_KEY` é opcional (necessária apenas se desejar dados de futuros/derivativos).
+Preencha suas credenciais no `.env`:
+```ini
+TELEGRAM_BOT_TOKEN=seu_token_aqui
+TELEGRAM_CHAT_ID=seu_chat_id_aqui
+COINGLASS_API_KEY=sua_chave_opcional
+```
 
-### 3. Comandos de Execução
+### 3. Execução
 ```bash
 # Teste rápido (1 ciclo com 3 tokens):
 python run.py --test
 
-# Executar o Caçador de Gems (CoinGecko + CoinGlass):
+# Modo Caçador de Gems 24/7:
 python run.py --mode gems
 
-# Executar o Monitor de DEX (DexScreener + Honeypot):
+# Modo Monitor de DEX:
 python run.py --mode dex
-
-# Executar ambos simultaneamente:
-python run.py --mode all
 ```
 
----
-
-## 🧪 Testes Unitários
-
-Para rodar a suíte com os 19 testes automatizados:
-
+### 4. Executar os Testes Unitários
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Resultado:
-```
-Ran 19 tests in 0.005s
-OK
-```
+---
+
+## 🌟 Minha Filosofia
+
+> *"Não sou programador. Uso IA para desenvolver, busco as informações de que preciso e discuto melhorias continuamente."*
+
+Este repositório é a prova de que, com curiosidade, dedicação, busca de informações e o uso consciente da IA como copiloto, qualquer pessoa pode conceber uma ideia, construir um primeiro protótipo e evoluí-lo até um projeto de nível profissional.
 
 ---
 
@@ -150,6 +195,6 @@ Distribuído sob a licença [MIT](LICENSE).
 
 <div align="center">
 
-*Concepção e evolução de código por [EliLyn](https://github.com/EliLyn).*
+Desenvolvido por **[EliLyn](https://github.com/EliLyn)**.
 
 </div>
