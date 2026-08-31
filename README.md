@@ -13,6 +13,7 @@
 [A Evolução do Código](#-a-evolução-do-código) •
 [Como Funciona](#-como-funciona) •
 [Instalação](#-instalação-e-uso) •
+[Aviso Legal](#-aviso-legal-disclaimer) •
 [Testes](#-testes)
 
 </div>
@@ -105,6 +106,14 @@ python run.py --mode gems
 # Rodar o monitor de DEX:
 python run.py --mode dex
 ```
+
+---
+
+## ⚠️ Aviso Legal (Disclaimer)
+
+- **Sem Recomendação Financeira:** Este software é um projeto experimental e educacional de automação de dados públicos. Nenhuma informação, alerta ou nota gerada por este robô constitui conselho de investimento, recomendação de compra ou venda de ativos financeiros.
+- **Risco do Mercado:** O mercado de criptomoedas — especialmente moedas de baixa liquidez e micro-capitalização — envolve alto risco de perda total do capital investido.
+- **Responsabilidade do Usuário:** O autor não se responsabiliza por quaisquer decisões financeiras, lucros ou perdas decorrentes do uso direto ou indireto deste código. Qualquer pessoa que utilize este software o faz por sua própria conta e risco.
 
 ---
 
