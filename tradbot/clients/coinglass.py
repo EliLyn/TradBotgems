@@ -1,14 +1,29 @@
 """
-Cliente de integração com a API CoinGlass (Derivativos, OI, Funding Rate, Liquidações).
+Cliente de integração com a API CoinGlass (funções <= 25 linhas).
 """
 
-import logging
 from typing import Optional
 from ..config import settings
 from ..models import DerivativesMetrics
 from .base import BaseHttpClient
 
-logger = logging.getLogger("tradbot.coinglass")
+
+def _parse_overview(data: dict, m: DerivativesMetrics):
+    """Extrai métricas de OI, Funding Rate, L/S Ratio e Volume de Futuros."""
+    oi_list = data.get("openInterest") or []
+    if isinstance(oi_list, list) and oi_list:
+        m.open_interest = sum(i.get("openInterest", 0) for i in oi_list if i.get("openInterest") is not None)
+    fr = data.get("avgFundingRate")
+    if fr is not None:
+        m.funding_rate = fr * 100
+    m.long_short_ratio = data.get("longShortRatio")
+    m.futures_volume_24h_usd = data.get("vol24h")
+
+
+def _parse_liquidations(items: list, m: DerivativesMetrics):
+    """Calcula soma das liquidações de long e short em 24h."""
+    m.liquidation_long_24h_usd = sum(i.get("longVol", 0) or 0 for i in items if isinstance(i, dict))
+    m.liquidation_short_24h_usd = sum(i.get("shortVol", 0) or 0 for i in items if isinstance(i, dict))
 
 
 class CoinGlassClient(BaseHttpClient):
@@ -17,57 +32,21 @@ class CoinGlassClient(BaseHttpClient):
         self.api_key = api_key or settings.coinglass.api_key
         self.base_url = settings.coinglass.base_url
 
-    def _get_headers(self):
-        return {
-            "accept": "application/json",
-            "coinglassSecret": self.api_key
-        }
+    def _get_headers(self) -> dict:
+        """Retorna cabeçalhos com a chave secreta da CoinGlass."""
+        return {"accept": "application/json", "coinglassSecret": self.api_key}
 
     async def get_derivatives_data(self, symbol: str) -> DerivativesMetrics:
         """Busca dados de derivativos (OI, Funding Rate, L/S Ratio, Liquidações) da CoinGlass."""
-        metrics = DerivativesMetrics()
+        m = DerivativesMetrics()
         if not self.api_key:
-            return metrics
-
-        headers = self._get_headers()
-        clean_symbol = symbol.upper().replace("USDT", "").replace("USD", "")
-
-        # 1. Resumo da moeda (OI, Funding Rate, Long/Short Ratio, Volume)
-        overview_url = f"{self.base_url}/coin_summary?symbol={clean_symbol}"
-        overview_data = await self.fetch_json(overview_url, headers=headers)
-
-        if overview_data and overview_data.get("code") == "0" and overview_data.get("data"):
-            data_dict = overview_data["data"]
-            
-            # Open Interest
-            oi_list = data_dict.get("openInterest")
-            if oi_list and isinstance(oi_list, list):
-                total_oi = sum(item.get("openInterest", 0) for item in oi_list if item.get("openInterest") is not None)
-                metrics.open_interest = total_oi
-
-            # Funding Rate (convertido para porcentagem)
-            avg_fr = data_dict.get("avgFundingRate")
-            if avg_fr is not None:
-                metrics.funding_rate = avg_fr * 100
-
-            # Long/Short Ratio
-            metrics.long_short_ratio = data_dict.get("longShortRatio")
-
-            # Futures Volume 24h
-            metrics.futures_volume_24h_usd = data_dict.get("vol24h")
-
-        # 2. Liquidações nas últimas 24h
-        liquidation_url = f"{self.base_url}/liquidation?symbol={clean_symbol}&time_type=24h"
-        liquidation_data = await self.fetch_json(liquidation_url, headers=headers)
-
-        if liquidation_data and liquidation_data.get("code") == "0" and liquidation_data.get("data"):
-            items = liquidation_data["data"]
-            total_long = 0.0
-            total_short = 0.0
-            for item in items:
-                total_long += item.get("longVol", 0) or 0
-                total_short += item.get("shortVol", 0) or 0
-            metrics.liquidation_long_24h_usd = total_long
-            metrics.liquidation_short_24h_usd = total_short
-
-        return metrics
+            return m
+        h = self._get_headers()
+        sym = symbol.upper().replace("USDT", "").replace("USD", "")
+        ov = await self.fetch_json(f"{self.base_url}/coin_summary?symbol={sym}", headers=h)
+        if ov and ov.get("code") == "0" and ov.get("data"):
+            _parse_overview(ov["data"], m)
+        liq = await self.fetch_json(f"{self.base_url}/liquidation?symbol={sym}&time_type=24h", headers=h)
+        if liq and liq.get("code") == "0" and liq.get("data"):
+            _parse_liquidations(liq["data"], m)
+        return m

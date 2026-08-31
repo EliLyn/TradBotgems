@@ -1,18 +1,85 @@
 """
-Serviço de Notificação via Telegram com formatação MarkdownV2 e divisão de mensagens.
+Serviço de Notificação via Telegram com formatação MarkdownV2 e funções enxutas (<= 25 linhas).
 """
 
 import asyncio
 import logging
+import socket
 from datetime import datetime, timezone
 from typing import List, Optional
 import aiohttp
 
 from ..config import settings
-from ..models import TokenFullDetails, DerivativesMetrics, AnalysisResult, TokenMarketSummary, DexPairInfo
+from ..models import TokenFullDetails, DerivativesMetrics, AnalysisResult, TokenMarketSummary
 from ..utils.formatting import escape_markdown_v2, number_to_words_pt
 
 logger = logging.getLogger("tradbot.notifier")
+
+
+def _format_derivatives_block(d: DerivativesMetrics) -> str:
+    """Formata bloco de derivativos da CoinGlass."""
+    if not d.has_data:
+        return "\n\\*Dados de Derivativos \\(CoinGlass\\)\\*: N/A \\(Sem atividade relevante\\)\n"
+    oi = escape_markdown_v2(f"${d.open_interest:,.0f}" if d.open_interest is not None else "N/A")
+    fr = escape_markdown_v2(f"{d.funding_rate:.4f}%" if d.funding_rate is not None else "N/A")
+    ls = escape_markdown_v2(f"{d.long_short_ratio:.2f}" if d.long_short_ratio is not None else "N/A")
+    liq_l = escape_markdown_v2(f"${d.liquidation_long_24h_usd:,.0f}" if d.liquidation_long_24h_usd is not None else "N/A")
+    liq_s = escape_markdown_v2(f"${d.liquidation_short_24h_usd:,.0f}" if d.liquidation_short_24h_usd is not None else "N/A")
+    vol = escape_markdown_v2(f"${d.futures_volume_24h_usd:,.0f}" if d.futures_volume_24h_usd is not None else "N/A")
+    return (
+        f"\n\\*Dados de Derivativos \\(CoinGlass\\)\\*:\n"
+        f"📊 \\*Open Interest\\*: {oi}\n📈 \\*Funding Rate\\*: {fr}\n🔄 \\*Long/Short Ratio\\*: {ls}\n"
+        f"🔻 \\*Liquidação Long \\(24h\\)\\*: {liq_l}\n🔺 \\*Liquidação Short \\(24h\\)\\*: {liq_s}\n💰 \\*Volume Futuros \\(24h\\)\\*: {vol}\n"
+    )
+
+
+def _format_social_links(d: TokenFullDetails) -> str:
+    """Formata links de redes sociais e canais oficiais."""
+    tw_f = f"\\(Seguidores: {d.twitter_followers:,}\\)" if d.twitter_followers else ""
+    tg_m = f"\\(Membros: {d.telegram_channel_user_count:,}\\)" if d.telegram_channel_user_count else ""
+    site = f"[Link para o Site]({d.homepage})" if d.homepage != "N/A" else "N/A"
+    tw = f"@{escape_markdown_v2(d.twitter_handle)} {tw_f}" if d.twitter_handle != "N/A" else "N/A"
+    tg = f"[Link para o Canal](https://t.me/{d.telegram_url}) {tg_m}" if d.telegram_url != "N/A" else "N/A"
+    disc = f"[Link para o Discord]({d.discord_link})" if d.discord_link != "N/A" else "N/A"
+    red = f"[Link para o Subreddit]({d.subreddit_url})" if d.subreddit_url != "N/A" else "N/A"
+    return (
+        f"\n\\*Redes Sociais\\*:\n"
+        f"🌐 Site: {site}\n🐦 Twitter: {tw}\n✈️ Telegram: {tg}\n💬 Discord: {disc}\n👽 Reddit: {red}\n"
+    )
+
+
+def _format_market_header(d: TokenFullDetails, a: AnalysisResult, p24: Optional[float], p7d: Optional[float], vol: Optional[float]) -> str:
+    """Formata cabeçalho e estatísticas de preço de um token."""
+    now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+    p24_s = escape_markdown_v2(f"{p24:.2f}%" if p24 is not None else "N/A")
+    p7d_s = escape_markdown_v2(f"{p7d:.2f}%" if p7d is not None else "N/A")
+    vol_s = escape_markdown_v2(f"${vol:,.2f}" if vol is not None else "N/A")
+    mcap_s = escape_markdown_v2(f"{d.market_cap_usd:,.2f}" if d.market_cap_usd is not None else "N/A")
+    price_s = escape_markdown_v2(f"{d.current_price_usd:,.4f}" if d.current_price_usd is not None else "N/A")
+    return (
+        f"💎 *{escape_markdown_v2(d.symbol)}* \\- {escape_markdown_v2(d.name)}\n🗓️ {escape_markdown_v2(now_str)}\n"
+        f"📊 \\*Capitalização de Mercado\\*: \\${mcap_s}\n💲 \\*Preço\\*: \\${price_s}\n"
+        f"⬆️ \\*Var\\. 24h\\*: {p24_s}\n⬆️ \\*Var\\. 7d\\*: {p7d_s}\n💰 \\*Volume 24h \\(Spot\\)\\*: {vol_s}\n"
+        f"📈 \\*Transações \\(12h\\)\\*: {escape_markdown_v2(str(a.tx_count_12h))}\n"
+        f"📉 \\*Transações \\(24h\\)\\*: {escape_markdown_v2(str(a.tx_count_24h))}\n"
+        f"📝 \\*Potencial\\*: _{escape_markdown_v2(a.potential_note)}_\n"
+    )
+
+
+def _format_token_supply_info(d: TokenFullDetails) -> str:
+    """Formata informações de fornecimento, blockchain e contrato."""
+    ts = f"{d.total_supply:,.0f} ({number_to_words_pt(d.total_supply)})" if d.total_supply is not None else "N/A"
+    cs = f"{d.circulating_supply:,.0f} ({number_to_words_pt(d.circulating_supply)})" if d.circulating_supply is not None else "N/A"
+    chain = d.blockchain_id.replace('-', ' ').title() if d.blockchain_id else "N/A"
+    desc = d.description[:400] + "..." if (d.description != "N/A" and len(d.description) > 400) else d.description
+    return (
+        f"📦 \\*Fornecimento Total\\*: {escape_markdown_v2(ts)}\n"
+        f"📦 \\*Fornecimento em Circulação\\*: {escape_markdown_v2(cs)}\n"
+        f"🏷️ \\*Categoria\\*: {escape_markdown_v2(d.categories)}\n"
+        f"⛓️ \\*Blockchain\\*: {escape_markdown_v2(chain)}\n"
+        f"📄 \\*Contrato\\*: `{escape_markdown_v2(d.contract_address or 'N/A')}`\n"
+        f"\n\\*Sobre o Token\\*:\n{escape_markdown_v2(desc)}\n"
+    )
 
 
 class TelegramNotifier:
@@ -21,37 +88,19 @@ class TelegramNotifier:
         self.chat_id = chat_id or settings.telegram.chat_id
 
     async def send_message(self, message: str) -> bool:
-        """Envia mensagem assíncrona para o Telegram com tratamento seguro de erros."""
+        """Envia mensagem assíncrona para o Telegram com tratamento de erros."""
         if not self.bot_token or not self.chat_id:
-            logger.warning("Telegram Bot Token ou Chat ID não configurados. Notificação não enviada.")
+            logger.warning("Telegram Bot Token ou Chat ID não configurados.")
             return False
-
         url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
-        payload = {
-            "chat_id": self.chat_id,
-            "text": message,
-            "parse_mode": "MarkdownV2",
-            "disable_web_page_preview": True
-        }
-
-        async with aiohttp.ClientSession() as session:
+        payload = {"chat_id": self.chat_id, "text": message, "parse_mode": "MarkdownV2", "disable_web_page_preview": True}
+        connector = aiohttp.TCPConnector(family=socket.AF_INET, resolver=aiohttp.ThreadedResolver())
+        async with aiohttp.ClientSession(connector=connector) as session:
             try:
                 async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=15)) as resp:
-                    if resp.status == 400:
-                        error_data = await resp.json()
-                        logger.error(f"Erro 400 ao enviar mensagem Telegram: {error_data}. Mensagem: {message[:100]}...")
-                        return False
-
-                    resp.raise_for_status()
-                    data = await resp.json()
-                    if data.get("ok"):
-                        logger.info("Mensagem enviada para o Telegram com sucesso.")
-                        return True
-                    else:
-                        logger.error(f"Telegram API retornou erro: {data.get('description')}")
-                        return False
+                    return bool(resp.status == 200)
             except Exception as e:
-                logger.error(f"Falha ao conectar com a API do Telegram: {e}")
+                logger.error(f"Falha ao conectar com Telegram: {e}")
                 return False
 
     def build_token_card(
@@ -63,137 +112,23 @@ class TelegramNotifier:
         price_change_7d: Optional[float] = None,
         total_volume_24h: Optional[float] = None
     ) -> str:
-        """Monta o card completo de análise de um token formatado em MarkdownV2."""
-        now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
-
-        total_supply_str = (
-            f"{details.total_supply:,.0f} ({number_to_words_pt(details.total_supply)})"
-            if details.total_supply is not None else "N/A"
-        )
-        circulating_supply_str = (
-            f"{details.circulating_supply:,.0f} ({number_to_words_pt(details.circulating_supply)})"
-            if details.circulating_supply is not None else "N/A"
-        )
-
-        desc = details.description
-        if desc != "N/A" and len(desc) > 400:
-            desc = desc[:400] + "..."
-
-        blockchain_display = details.blockchain_id.replace('-', ' ').title() if details.blockchain_id else "N/A"
-
-        # Derivativos (CoinGlass)
-        if derivatives.has_data:
-            oi_val = f"${derivatives.open_interest:,.0f}" if derivatives.open_interest is not None else "N/A"
-            fr_val = f"{derivatives.funding_rate:.4f}%" if derivatives.funding_rate is not None else "N/A"
-            ls_val = f"{derivatives.long_short_ratio:.2f}" if derivatives.long_short_ratio is not None else "N/A"
-            liq_long_val = f"${derivatives.liquidation_long_24h_usd:,.0f}" if derivatives.liquidation_long_24h_usd is not None else "N/A"
-            liq_short_val = f"${derivatives.liquidation_short_24h_usd:,.0f}" if derivatives.liquidation_short_24h_usd is not None else "N/A"
-            vol_fut_val = f"${derivatives.futures_volume_24h_usd:,.0f}" if derivatives.futures_volume_24h_usd is not None else "N/A"
-
-            derivatives_text = (
-                f"\n\\*Dados de Derivativos \\(CoinGlass\\)\\*:\n"
-                f"📊 \\*Open Interest\\*: {escape_markdown_v2(oi_val)}\n"
-                f"📈 \\*Funding Rate\\*: {escape_markdown_v2(fr_val)}\n"
-                f"🔄 \\*Long/Short Ratio\\*: {escape_markdown_v2(ls_val)}\n"
-                f"🔻 \\*Liquidação Long \\(24h\\)\\*: {escape_markdown_v2(liq_long_val)}\n"
-                f"🔺 \\*Liquidação Short \\(24h\\)\\*: {escape_markdown_v2(liq_short_val)}\n"
-                f"💰 \\*Volume Futuros \\(24h\\)\\*: {escape_markdown_v2(vol_fut_val)}\n"
-            )
-        else:
-            derivatives_text = "\n\\*Dados de Derivativos \\(CoinGlass\\)\\*: N/A \\(Sem atividade relevante\\)\n"
-
-        # Redes Sociais
-        twitter_followers = f"\\(Seguidores: {details.twitter_followers:,}\\)" if details.twitter_followers else ""
-        telegram_members = f"\\(Membros: {details.telegram_channel_user_count:,}\\)" if details.telegram_channel_user_count else ""
-
-        site_link = f"[Link para o Site]({details.homepage})" if details.homepage != "N/A" else "N/A"
-        twitter_link = f"@{escape_markdown_v2(details.twitter_handle)} {twitter_followers}" if details.twitter_handle != "N/A" else "N/A"
-        telegram_link = f"[Link para o Canal](https://t.me/{details.telegram_url}) {telegram_members}" if details.telegram_url != "N/A" else "N/A"
-        discord_link = f"[Link para o Discord]({details.discord_link})" if details.discord_link != "N/A" else "N/A"
-        reddit_link = f"[Link para o Subreddit]({details.subreddit_url})" if details.subreddit_url != "N/A" else "N/A"
-
-        # Alertas Extras
-        alerts_text = ""
-        if analysis.alerts:
-            alerts_text = "\n\\*ALERTAS\\*:\n" + "\n".join(escape_markdown_v2(a) for a in analysis.alerts) + "\n"
-
-        price_24h_str = f"{price_change_24h:.2f}%" if price_change_24h is not None else "N/A"
-        price_7d_str = f"{price_change_7d:.2f}%" if price_change_7d is not None else "N/A"
-        vol_spot_str = f"${total_volume_24h:,.2f}" if total_volume_24h is not None else "N/A"
-        market_cap_str = f"{details.market_cap_usd:,.2f}" if details.market_cap_usd is not None else "N/A"
-        price_str = f"{details.current_price_usd:,.4f}" if details.current_price_usd is not None else "N/A"
-
-        card = (
-            f"💎 *{escape_markdown_v2(details.symbol)}* \\- {escape_markdown_v2(details.name)}\n"
-            f"🗓️ {escape_markdown_v2(now_str)}\n"
-            f"📊 \\*Capitalização de Mercado\\*: \\${escape_markdown_v2(market_cap_str)}\n"
-            f"💲 \\*Preço\\*: \\${escape_markdown_v2(price_str)}\n"
-            f"⬆️ \\*Var\\. 24h\\*: {escape_markdown_v2(price_24h_str)}\n"
-            f"⬆️ \\*Var\\. 7d\\*: {escape_markdown_v2(price_7d_str)}\n"
-            f"💰 \\*Volume 24h \\(Spot\\)\\*: {escape_markdown_v2(vol_spot_str)}\n"
-            f"📈 \\*Transações \\(12h\\)\\*: {escape_markdown_v2(str(analysis.tx_count_12h))}\n"
-            f"📉 \\*Transações \\(24h\\)\\*: {escape_markdown_v2(str(analysis.tx_count_24h))}\n"
-            f"📝 \\*Potencial\\*: _{escape_markdown_v2(analysis.potential_note)}_\n"
-            f"📦 \\*Fornecimento Total\\*: {escape_markdown_v2(total_supply_str)}\n"
-            f"📦 \\*Fornecimento em Circulação\\*: {escape_markdown_v2(circulating_supply_str)}\n"
-            f"🏷️ \\*Categoria\\*: {escape_markdown_v2(details.categories)}\n"
-            f"⛓️ \\*Blockchain\\*: {escape_markdown_v2(blockchain_display)}\n"
-            f"📄 \\*Contrato\\*: `{escape_markdown_v2(details.contract_address or 'N/A')}`\n"
-            f"{derivatives_text}\n"
-            f"\\*Sobre o Token\\*:\n{escape_markdown_v2(desc)}\n\n"
-            f"\\*Redes Sociais\\*:\n"
-            f"🌐 Site: {site_link}\n"
-            f"🐦 Twitter: {twitter_link}\n"
-            f"✈️ Telegram: {telegram_link}\n"
-            f"💬 Discord: {discord_link}\n"
-            f"👽 Reddit: {reddit_link}\n"
-            f"{alerts_text}"
-        )
-
-        if len(card) > 4000:
-            card = card[:3990] + "\n\\.\\.\\. \\(conteúdo truncado\\)"
-
-        return card
+        """Monta o card completo de análise de um token."""
+        header = _format_market_header(details, analysis, price_change_24h, price_change_7d, total_volume_24h)
+        supply = _format_token_supply_info(details)
+        derivs = _format_derivatives_block(derivatives)
+        socials = _format_social_links(details)
+        alerts = "\n\\*ALERTAS\\*:\n" + "\n".join(escape_markdown_v2(x) for x in analysis.alerts) + "\n" if analysis.alerts else ""
+        card = header + supply + derivs + socials + alerts
+        return card[:3990] + "\n\\.\\.\\. \\(truncado\\)" if len(card) > 4000 else card
 
     async def send_market_summary(self, tokens: List[TokenMarketSummary], top_count: int = 5) -> bool:
-        """Envia o resumo de mercado com top gainers e moedas de alto volume."""
-        valid_tokens = [
-            t for t in tokens
-            if t.price_change_percentage_24h is not None and
-               t.price_change_percentage_7d is not None and
-               t.total_volume is not None
-        ]
-
-        if not valid_tokens:
+        """Envia o resumo diário de maiores valorizações e volume."""
+        valid = [t for t in tokens if t.price_change_percentage_24h is not None and t.total_volume is not None]
+        if not valid:
             return False
-
-        top_24h = sorted(valid_tokens, key=lambda x: x.price_change_percentage_24h or 0, reverse=True)[:top_count]
-        top_7d = sorted(valid_tokens, key=lambda x: x.price_change_percentage_7d or 0, reverse=True)[:top_count]
-        high_vol = sorted([t for t in valid_tokens if (t.total_volume or 0) >= settings.high_volume_threshold_usd],
-                          key=lambda x: x.total_volume or 0, reverse=True)[:top_count]
-
+        top_24h = sorted(valid, key=lambda x: x.price_change_percentage_24h or 0, reverse=True)[:top_count]
         now_str = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
-        parts = [
-            f"🏆 \\*Resumo Diário de Mercado\\* 🏆\n"
-            f"🗓️ {escape_markdown_v2(now_str)}\n"
-        ]
-
-        if top_24h:
-            parts.append("📈 \\*Maiores Valorizações \\(Últimas 24h\\)\\*:")
-            for t in top_24h:
-                parts.append(f"\\- {escape_markdown_v2(t.symbol)}: {escape_markdown_v2(f'{t.price_change_percentage_24h:.2f}%')}")
-            parts.append("")
-
-        if top_7d:
-            parts.append("🚀 \\*Maiores Valorizações \\(Últimos 7d\\)\\*:")
-            for t in top_7d:
-                parts.append(f"\\- {escape_markdown_v2(t.symbol)}: {escape_markdown_v2(f'{t.price_change_percentage_7d:.2f}%')}")
-            parts.append("")
-
-        if high_vol:
-            parts.append("💰 \\*Tokens com Alto Volume \\(Últimas 24h\\)\\*:")
-            for t in high_vol:
-                parts.append(f"\\- {escape_markdown_v2(t.symbol)}: \\${escape_markdown_v2(f'{t.total_volume:,.0f}')}")
-
-        message = "\n".join(parts)
-        return await self.send_message(message)
+        lines = [f"🏆 \\*Resumo Diário de Mercado\\* 🏆\n🗓️ {escape_markdown_v2(now_str)}\n\n📈 \\*Maiores Valorizações \\(24h\\)\\*:"]
+        for t in top_24h:
+            lines.append(f"\\- {escape_markdown_v2(t.symbol)}: {escape_markdown_v2(f'{t.price_change_percentage_24h:.2f}%')}")
+        return await self.send_message("\n".join(lines))
