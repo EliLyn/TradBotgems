@@ -17,15 +17,15 @@ logs/
 *.json
 !tradbot/default_config.json
 
-# Backup folder & legacy scripts with hardcoded credentials
+# Backup folder & legacy scripts at root with hardcoded credentials
 backup_original/
-TradBotGems.py
-data_collector.py
-SuperDataCollector.py
-dex_monitor.py
-dex_monitor_test.py
-bitget_websocket.py
-bitget_sdk_websocket_test.py
+/TradBotGems.py
+/data_collector.py
+/SuperDataCollector.py
+/dex_monitor.py
+/dex_monitor_test.py
+/bitget_websocket.py
+/bitget_sdk_websocket_test.py
 
 # Audio files
 *.wav
